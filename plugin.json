@@ -1,0 +1,10 @@
+{
+  "name": "network",
+  "permissions": {
+    "android": ["android.permission.ACCESS_NETWORK_STATE"],
+    "ios": {}
+  },
+  "methods": ["getStatus"],
+  "hooks": [],
+  "events": ["network:changed"]
+}
