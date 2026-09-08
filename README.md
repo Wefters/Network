@@ -1,98 +1,111 @@
 # @wefterjs/network
 
-Official Wefter plugin for querying real-time connectivity status and listening to network state changes on Android (`ConnectivityManager`) and iOS (`NWPathMonitor`).
-
----
+Official Wefter plugin for querying real-time connectivity status and listening to network state changes on Android and iOS.
 
 ## Features
 
-- 🌐 **Network Status Inspection**: Query active connection state and interface type (`wifi`, `cellular`, `ethernet`, `none`) with `getStatus()`.
-- 📡 **Real-Time Event Listener**: Subscribe to `onStatusChange` callbacks when connection toggles online/offline or switches transport.
-- ⚡ **Offline-First Ready**: Zero background polling overhead; relies on native OS push callbacks (`NetworkCallback` / `NWPathMonitor`).
+- Query online connectivity state and transport type (Wi-Fi, cellular, ethernet, bluetooth, VPN, unknown, or none).
+- Subscribe to real-time connection state change notifications without background polling.
+- Zero battery overhead, using native push callbacks from the host operating system.
 
----
+## Installation and setup
 
-## Installation & Setup
-
-1. Add the plugin to your Wefter project:
+Install the plugin package in your Wefter application:
 
 ```bash
 wefter add @wefterjs/network
-```
-
-2. Synchronize native projects:
-
-```bash
 wefter sync
 ```
 
----
+### Native permissions
 
-## JavaScript / TypeScript API Reference
+When synchronized:
+
+- Android automatically requests `<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />`.
+- iOS requires no additional permission keys.
+
+## JavaScript API reference
+
+Import `Network` from `@wefterjs/network`:
 
 ```ts
 import { Network } from "@wefterjs/network";
 ```
 
-### 1. `getStatus()`
-
-Returns current network connectivity status.
+### Check network status
 
 ```ts
-interface NetworkStatus {
-  connected: boolean;
-  connectionType: "wifi" | "cellular" | "ethernet" | "bluetooth" | "vpn" | "unknown" | "none";
-}
-
 const status = await Network.getStatus();
-console.log("Connected:", status.connected, "Type:", status.connectionType);
+
+console.log("Is connected:", status.connected);
+console.log("Connection type:", status.connectionType);
+// "wifi", "cellular", "ethernet", "bluetooth", "vpn", "unknown", or "none"
 ```
 
-### 2. `onStatusChange(callback)`
-
-Subscribes to network status updates. Returns a listener object with a `remove()` cleanup function.
+### Subscribe to network changes
 
 ```ts
-const listener = Network.onStatusChange((status) => {
+const sub = Network.onStatusChange((status) => {
   if (status.connected) {
-    console.log("Back online via", status.connectionType);
+    console.log("Online via:", status.connectionType);
   } else {
-    console.warn("Device went offline");
+    console.log("Device is offline");
   }
 });
 
 // To unsubscribe:
-listener.remove();
+sub.remove();
 ```
 
----
-
-## Complete Usage Example
+## Complete usage example
 
 ```ts
-import { Network } from "@wefterjs/network";
+import { Network, type NetworkStatus } from "@wefterjs/network";
 
-export class NetworkObserver {
+export class ConnectivityService {
   private listener?: { remove(): void };
 
-  async start(): Promise<void> {
-    const initial = await Network.getStatus();
-    this.updateUI(initial);
+  async initialize(onOffline: () => void, onOnline: (type: string) => void) {
+    const current = await Network.getStatus();
+    this.handleStatus(current, onOffline, onOnline);
 
     this.listener = Network.onStatusChange((status) => {
-      this.updateUI(status);
+      this.handleStatus(status, onOffline, onOnline);
     });
   }
 
-  stop(): void {
-    this.listener?.remove();
+  private handleStatus(
+    status: NetworkStatus,
+    onOffline: () => void,
+    onOnline: (type: string) => void
+  ) {
+    if (status.connected) {
+      onOnline(status.connectionType);
+    } else {
+      onOffline();
+    }
   }
 
-  private updateUI(status: { connected: boolean; connectionType: string }): void {
-    const banner = document.getElementById("offline-banner");
-    if (banner) {
-      banner.style.display = status.connected ? "none" : "block";
-    }
+  destroy() {
+    this.listener?.remove();
   }
 }
 ```
+
+## Platform implementation notes
+
+### Android
+
+- Uses `android.net.ConnectivityManager`.
+- Registers a `ConnectivityManager.NetworkCallback` with a `NetworkRequest` to receive notifications when networks become available, lost, or capabilities change.
+- Maps `NetworkCapabilities.TRANSPORT_*` flags into unified connection type strings.
+
+### iOS
+
+- Uses Apple's `Network.framework` and `NWPathMonitor`.
+- Starts monitoring on a dedicated background dispatch queue.
+- Inspects `NWPath.status` (`.satisfied` vs `.unsatisfied`) and interfaces (`.wifi`, `.cellular`, `.wiredEthernet`).
+
+## License
+
+[MIT](LICENSE) © 2026 Sandip Ghimire
