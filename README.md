@@ -74,11 +74,7 @@ export class ConnectivityService {
     });
   }
 
-  private handleStatus(
-    status: NetworkStatus,
-    onOffline: () => void,
-    onOnline: (type: string) => void
-  ) {
+  private handleStatus(status: NetworkStatus, onOffline: () => void, onOnline: (type: string) => void) {
     if (status.connected) {
       onOnline(status.connectionType);
     } else {

@@ -9,6 +9,7 @@ import android.os.Handler
 import android.os.Looper
 import org.json.JSONObject
 
+/** Reports connectivity from `ConnectivityManager` and emits `network:changed` whenever it changes. */
 class NetworkPlugin(context: Context, dispatcher: BridgeDispatcher) :
         WefterPlugin(context, dispatcher) {
 
@@ -18,14 +19,13 @@ class NetworkPlugin(context: Context, dispatcher: BridgeDispatcher) :
 
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
-    // Debounce rapid capability-change callbacks to a single emit per logical transition.
     private val debounceHandler = Handler(Looper.getMainLooper())
+    /** Changes arrive in bursts when switching networks, so events are sent once things settle. */
     private val debounceDelayMs = 150L
     private val emitRunnable = Runnable {
         try {
             emit("network:changed", currentStatusJson())
         } catch (e: Exception) {
-            // Ignore emit error
         }
     }
 
@@ -33,6 +33,7 @@ class NetworkPlugin(context: Context, dispatcher: BridgeDispatcher) :
         registerNetworkCallback()
     }
 
+    /** The current connection status. */
     @WefterMethod
     fun getStatus(payload: JSONObject, callback: (Result<Any>) -> Unit) {
         try {
@@ -42,6 +43,7 @@ class NetworkPlugin(context: Context, dispatcher: BridgeDispatcher) :
         }
     }
 
+    /** Listens for networks appearing, disappearing or changing capabilities. */
     private fun registerNetworkCallback() {
         try {
             val callback =
@@ -70,16 +72,16 @@ class NetworkPlugin(context: Context, dispatcher: BridgeDispatcher) :
             connectivityManager.registerNetworkCallback(request, callback)
             networkCallback = callback
         } catch (e: Exception) {
-            // Ignore registration error if permissions or capabilities unavailable
         }
     }
 
-    /** Schedule a debounced emit — removes any pending runnable first. */
+    /** Sends a `network:changed` event after the debounce delay, replacing any pending one. */
     private fun scheduleEmit() {
         debounceHandler.removeCallbacks(emitRunnable)
         debounceHandler.postDelayed(emitRunnable, debounceDelayMs)
     }
 
+    /** Connection status of the active network: whether it can reach the internet and its transport. */
     private fun currentStatusJson(): JSONObject {
         val activeNetwork = connectivityManager.activeNetwork
         val capabilities = connectivityManager.getNetworkCapabilities(activeNetwork)

@@ -1,8 +1,10 @@
 import Foundation
 import Network
 
+/// Reports connectivity with `NWPathMonitor` and emits `network:changed` whenever it changes.
 final class NetworkPlugin: WefterPlugin {
 
+    /// Starts monitoring on first use and emits every path change.
     private lazy var monitor: NWPathMonitor = {
         let m = NWPathMonitor()
         m.pathUpdateHandler = { [weak self] path in
@@ -18,10 +20,12 @@ final class NetworkPlugin: WefterPlugin {
     private let monitorQueue = DispatchQueue(label: "dev.wefter.plugins.network")
     private var currentPath: NWPath?
 
+    /// Makes sure the path monitor is running.
     private func ensureMonitoring() {
         _ = monitor
     }
 
+    /// The current connection status.
     // @WefterMethod
     func getStatus(payload: [String: Any], callback: @escaping (Result<Any, Error>) -> Void) throws {
         ensureMonitoring()
@@ -30,6 +34,7 @@ final class NetworkPlugin: WefterPlugin {
         resolve(callback, data: status)
     }
 
+    /// Connection status for a network path: whether it is usable and which interface it uses.
     private func statusDict(for path: NWPath) -> [String: Any] {
         let isConnected = path.status == .satisfied
         let connectionType: String
@@ -53,6 +58,7 @@ final class NetworkPlugin: WefterPlugin {
         ]
     }
 
+    /// Whether traffic goes through a VPN tunnel interface.
     private func isVPN(_ path: NWPath) -> Bool {
         let vpnPrefixes = ["utun", "tun", "tap", "ppp", "ipsec"]
         return path.availableInterfaces.contains { iface in
